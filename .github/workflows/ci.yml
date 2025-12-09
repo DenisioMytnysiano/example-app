@@ -122,7 +122,7 @@ jobs:
       - name: Build Docker image
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          IMAGE_REF="$IMAGE_NAME:$SHORT_SHA"
+          IMAGE_REF="ghcr.io/denisiomytnysiano/example-app/fastapi-ping:$SHORT_SHA"
           echo "Building $IMAGE_REF"
           docker build -t "$IMAGE_REF" .
 
@@ -167,9 +167,6 @@ jobs:
       contents: read
       packages: write
 
-    env:
-      IMAGE_NAME: ghcr.io/denisiomytnysiano/example-app/fastapi-ping
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -187,7 +184,7 @@ jobs:
       - name: Build and push image to GHCR
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          IMAGE_REF="$IMAGE_NAME:$SHORT_SHA"
+          IMAGE_REF="ghcr.io/denisiomytnysiano/example-app/fastapi-ping:$SHORT_SHA"
           echo "Pushing $IMAGE_REF"
           docker build -t "$IMAGE_REF" .
           docker push "$IMAGE_REF"
