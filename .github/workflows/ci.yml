@@ -13,9 +13,6 @@ jobs:
     permissions:
       contents: read
 
-    env:
-      IMAGE_NAME: ghcr.io/denisiomytnysiano/example-app/fastapi-ping
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -38,6 +35,9 @@ jobs:
 
     permissions:
       contents: read
+
+    env:
+      IMAGE_NAME: ghcr.io/denisiomytnysiano/example-app/fastapi-ping
 
     steps:
       - name: Checkout repository
