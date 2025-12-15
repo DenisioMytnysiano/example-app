@@ -2,10 +2,21 @@ name: Infra CI
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action to run (apply or destroy)"
+        required: true
+        default: apply
+        type: choice
+        options:
+          - apply
+          - destroy
+
   push:
     branches: [ main, master ]
     paths:
       - 'infra/**'
+
   pull_request:
     branches: [ main, master ]
     paths:
@@ -66,15 +77,16 @@ jobs:
 
       - name: Terraform plan
         working-directory: ./infra
-        run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          terraform plan -var-file=dev.tfvars
+        run: terraform plan -var-file=dev.tfvars
 
   terraform-apply:
     runs-on: ubuntu-latest
     needs: terraform-check
 
-    if: github.ref == 'refs/heads/master'
+    # Apply only on master AND not destroy
+    if: |
+      github.ref == 'refs/heads/master' &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.action == 'apply')
 
     env:
       AWS_REGION: eu-central-1
@@ -99,8 +111,42 @@ jobs:
 
       - name: Terraform apply
         working-directory: ./infra
+        run: terraform apply -auto-approve -var-file=dev.tfvars
+
+  terraform-destroy:
+    runs-on: ubuntu-latest
+
+    # Destroy ONLY when manually triggered with action=destroy
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.action == 'destroy'
+
+    env:
+      AWS_REGION: eu-central-1
+
+    steps:
+      - name: ⚠️ Confirm destroy intent
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          terraform apply \
-            -auto-approve \
-            -var-file=dev.tfvars
+          echo "This will DESTROY all Terraform-managed infrastructure."
+          echo "Triggered by $GITHUB_ACTOR"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        working-directory: ./infra
+        run: terraform init -input=false
+
+      - name: Terraform destroy
+        working-directory: ./infra
+        run: terraform destroy -auto-approve -var-file=dev.tfvars
