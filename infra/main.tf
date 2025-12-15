@@ -7,9 +7,9 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "terraform-state-bucket-6944226566"
-    key    = "state.tfstate"
-    region = "us-west-1"
+    bucket  = "terraform-state-bucket-6944226566"
+    key     = "state.tfstate"
+    region  = "us-west-1"
     profile = ""
   }
 
