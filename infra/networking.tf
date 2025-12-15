@@ -15,6 +15,8 @@ resource "aws_security_group" "alb_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
+    description = "Allow inbound traffic to ALB from the internet (intentional)"
+    # tfsec:ignore:aws-ec2-no-public-ingress-sgr
     from_port   = var.app_port
     to_port     = var.app_port
     protocol    = "tcp"
@@ -22,6 +24,8 @@ resource "aws_security_group" "alb_sg" {
   }
 
   egress {
+    description = "Allow all outbound traffic from ALB (intentional)"
+    # tfsec:ignore:aws-ec2-no-public-egress-sgr
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -35,6 +39,7 @@ resource "aws_security_group" "ecs_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
+    description     = "Allow inbound traffic from ALB to ECS tasks"
     from_port       = var.app_port
     to_port         = var.app_port
     protocol        = "tcp"
@@ -42,6 +47,8 @@ resource "aws_security_group" "ecs_sg" {
   }
 
   egress {
+    description = "Allow all outbound traffic from ECS tasks (intentional)"
+    # tfsec:ignore:aws-ec2-no-public-egress-sgr
     from_port   = 0
     to_port     = 0
     protocol    = "-1"

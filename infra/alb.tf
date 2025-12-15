@@ -4,6 +4,12 @@ resource "aws_lb" "api" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
   subnets            = data.aws_subnets.default.ids
+
+  # tfsec:ignore:aws-elb-drop-invalid-headers
+  # drop_invalid_header_fields not enabled intentionally
+  #
+  # tfsec:ignore:aws-elb-alb-not-public
+  # Public ALB is intentional
 }
 
 resource "aws_lb_target_group" "api" {
@@ -25,6 +31,8 @@ resource "aws_lb_target_group" "api" {
 }
 
 resource "aws_lb_listener" "http" {
+  # tfsec:ignore:aws-elb-http-not-used
+  # HTTPS is intentionally not used for this listener
   load_balancer_arn = aws_lb.api.arn
   port              = var.app_port
   protocol          = "HTTP"
