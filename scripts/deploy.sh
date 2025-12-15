@@ -9,7 +9,7 @@ TASK_FAMILY="example-api-task"
 
 CONTAINER_NAME="example-api"
 AWS_ACCOUNT_ID="$(aws sts get-caller-identity --query 'Account' --output text)"
-IMAGE_REF="ghcr.io/denisiomytnysiano/example-app/fastapi-ping:91eec67"
+IMAGE_REF="ghcr.io/denisiomytnysiano/example-app/fastapi-ping:${GITHUB_SHA::7}"
 
 echo "==> AWS identity:"
 aws sts get-caller-identity >/dev/null
