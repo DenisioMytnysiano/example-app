@@ -42,7 +42,7 @@ jobs:
 
       - name: Terraform validate
         working-directory: ./infra
-        run: terraform validate -var-file=dev.tfvars
+        run: terraform validate
 
       - name: Run tflint
         uses: terraform-linters/setup-tflint@v3
@@ -68,9 +68,7 @@ jobs:
         working-directory: ./infra
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          terraform plan \
-            -input=false \
-            -var-file=dev.tfvars
+          terraform plan -var-file=dev.tfvars
 
   terraform-apply:
     runs-on: ubuntu-latest
@@ -106,5 +104,4 @@ jobs:
           SHORT_SHA="${GITHUB_SHA::7}"
           terraform apply \
             -auto-approve \
-            -input=false \
             -var-file=dev.tfvars
