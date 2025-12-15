@@ -44,18 +44,25 @@ jobs:
         working-directory: ./infra
         run: terraform validate
 
-      - name: Install Terraform linters
-        run: |
-          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | sh -s -- -b /usr/local/bin
-
+      - name: Run tflint
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: latest
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Run tflint
+        working-directory: ./infra
+        run: tflint --init
+        continue-on-error: true
+        
       - name: Run tflint
         working-directory: ./infra
         run: tflint
-
+        
       - name: Run tfsec
-        working-directory: ./infra
-        run: tfsec .
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working-dir: ./infra
 
       - name: Terraform plan
         if: github.event_name == 'pull_request'
