@@ -218,4 +218,4 @@ jobs:
 
       - name: Deploy to ECS
         run: |
-          bash ./deploy.sh
+          bash ./scripts/deploy.sh
