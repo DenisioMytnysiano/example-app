@@ -167,6 +167,10 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      AWS_REGION: eu-central-1
+      ECR_REPOSITORY: example-app-fastapi
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -174,29 +178,85 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build and push image to GHCR
+      - name: Log in to Amazon ECR
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+      - name: Build and push image to ECR
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          IMAGE_REF="ghcr.io/denisiomytnysiano/example-app/fastapi-ping:$SHORT_SHA"
+          IMAGE_REF="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$SHORT_SHA"
           echo "Pushing $IMAGE_REF"
           docker build -t "$IMAGE_REF" .
           docker push "$IMAGE_REF"
 
-  deploy:
+  ecs-deploy:
     runs-on: ubuntu-latest
     needs: push-image
 
-    # Only run deploy on direct pushes to master
+    # Only deploy on direct pushes to master
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
+    env:
+      AWS_REGION: eu-central-1
+      ECS_CLUSTER: example-app-cluster
+      ECS_SERVICE: example-app-service
+      ECR_REPOSITORY: example-app-fastapi
+
     steps:
-      - name: Deploy
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Compute image tag
+        id: vars
         run: |
-          echo "Deploy step placeholder - add your deployment commands here"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Register new task definition revision and deploy
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        run: |
+          SHORT_SHA="${{ steps.vars.outputs.short_sha }}"
+          IMAGE_REF="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$SHORT_SHA"
+          echo "Deploying image $IMAGE_REF to ECS service $ECS_SERVICE in cluster $ECS_CLUSTER"
+
+          TASK_DEF_FAMILY="example-app-task"
+
+          aws ecs describe-task-definition --task-definition "$TASK_DEF_FAMILY" > taskdef.json
+
+          NEW_TASK_DEF=$(jq --arg IMAGE "$IMAGE_REF" '.taskDefinition
+            | .containerDefinitions[0].image = $IMAGE
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' taskdef.json)
+
+          echo "$NEW_TASK_DEF" > new-taskdef.json
+
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-taskdef.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$NEW_TASK_DEF_ARN" \
+            --force-new-deployment
